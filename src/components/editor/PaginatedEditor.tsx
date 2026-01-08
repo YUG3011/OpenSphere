@@ -366,6 +366,9 @@ const DEFAULT_LETTER = `
     <p>Sincerely,<br /> LegalBridge LLP</p>
 `;
 
+const DEFAULT_HEADER_TEXT = "This is a 10% header area";
+const DEFAULT_FOOTER_TEXT = "This is a 10% footer area";
+
 type ToolbarButtonProps = {
     label: string;
     icon: ComponentType<{ className?: string }>;
@@ -549,6 +552,10 @@ export const PaginatedEditor = () => {
     const [pageCount, setPageCount] = useState(1);
     const [activePage, setActivePage] = useState(1);
     const [pageStartNumber, setPageStartNumber] = useState(1);
+    const [headerText, setHeaderText] = useState(DEFAULT_HEADER_TEXT);
+    const [footerText, setFooterText] = useState(DEFAULT_FOOTER_TEXT);
+    const [editingRegion, setEditingRegion] = useState<"header" | "footer" | null>(null);
+    const [draftText, setDraftText] = useState("");
 
     const measureHeight = useCallback(() => {
         if (!contentRef.current) return;
@@ -698,8 +705,31 @@ export const PaginatedEditor = () => {
         setPageStartNumber(Math.max(1, value));
     };
 
+    const openEditor = (region: "header" | "footer") => {
+        setDraftText(region === "header" ? headerText : footerText);
+        setEditingRegion(region);
+    };
+
+    const closeEditor = () => {
+        setEditingRegion(null);
+        setDraftText("");
+    };
+
+    const saveEditor = () => {
+        if (!editingRegion) return;
+        const cleaned = draftText.trim() || (editingRegion === "header" ? DEFAULT_HEADER_TEXT : DEFAULT_FOOTER_TEXT);
+        if (editingRegion === "header") {
+            setHeaderText(cleaned);
+        } else {
+            setFooterText(cleaned);
+        }
+        setEditingRegion(null);
+        setDraftText("");
+    };
+
     return (
-        <section className="px-4 pb-12 pt-[140px]">
+        <>
+            <section className="px-4 pb-12 pt-[140px]">
             <div className="fixed left-0 right-0 top-0 z-40 flex justify-center px-4">
                 <div className="w-full max-w-[1100px] rounded-2xl border border-white/50 bg-white/90 p-2.5 shadow-lg backdrop-blur">
                     <div className="flex flex-wrap items-center justify-between gap-2">
@@ -924,7 +954,13 @@ export const PaginatedEditor = () => {
                 <div className="bg-slate-100/70 px-6 py-6">
                     <div className="relative flex justify-center" style={{ minHeight: documentHeight }}>
                         <PageOverlay pageCount={pageCount} />
-                        <HeaderFooterOverlay pageCount={pageCount} />
+                        <HeaderFooterOverlay
+                            pageCount={pageCount}
+                            headerText={headerText}
+                            footerText={footerText}
+                            onHeaderDoubleClick={() => openEditor("header")}
+                            onFooterDoubleClick={() => openEditor("footer")}
+                        />
                         <PageGapMask pageCount={pageCount} />
                         <PageTopPaddingMask pageCount={pageCount} />
                         <PageBottomPaddingMask pageCount={pageCount} />
@@ -949,7 +985,17 @@ export const PaginatedEditor = () => {
                     </div>
                 </div>
             </div>
-        </section>
+            </section>
+            {editingRegion ? (
+                <HeaderFooterEditModal
+                    region={editingRegion}
+                    value={draftText}
+                    onChange={setDraftText}
+                    onCancel={closeEditor}
+                    onSave={saveEditor}
+                />
+            ) : null}
+        </>
     );
 };
 
@@ -1088,32 +1134,102 @@ const PageBottomPaddingMask = ({ pageCount }: PageBottomPaddingMaskProps) => (
 
 type HeaderFooterOverlayProps = {
     pageCount: number;
+    headerText: string;
+    footerText: string;
+    onHeaderDoubleClick: () => void;
+    onFooterDoubleClick: () => void;
 };
 
-const HeaderFooterOverlay = ({ pageCount }: HeaderFooterOverlayProps) => (
+const HeaderFooterOverlay = ({
+    pageCount,
+    headerText,
+    footerText,
+    onHeaderDoubleClick,
+    onFooterDoubleClick,
+}: HeaderFooterOverlayProps) => (
     <div aria-hidden className="pointer-events-none absolute left-1/2 top-0 z-40 -translate-x-1/2 w-full">
         {Array.from({ length: pageCount }).map((_, index) => {
             const pageTop = index * (PAGE_HEIGHT + PAGE_GAP);
+            const footerTop = pageTop + PAGE_HEIGHT - PAGE_FOOTER_HEIGHT;
 
             return (
-                <div key={`hf-${index}`} className="absolute left-1/2 w-[8.5in] -translate-x-1/2 px-4" style={{ top: `${pageTop}px` }}>
+                <div key={`hf-${index}`}>
                     <div
-                        className="mx-auto flex items-center justify-center rounded-t-md border border-slate-400 bg-white/70 text-slate-600"
-                        style={{ height: `${PAGE_TOP_PADDING}px` }}
+                        className="pointer-events-auto absolute left-1/2 flex w-full max-w-[1100px] -translate-x-1/2 flex-col rounded-t-md border border-slate-400 bg-white/80 px-4 py-2 text-slate-600 shadow"
+                        style={{ top: `${pageTop}px`, height: `${PAGE_TOP_PADDING}px` }}
+                        onDoubleClick={onHeaderDoubleClick}
+                        role="button"
+                        tabIndex={0}
                     >
-                        <span className="text-[11px] font-semibold">This is a 10% header area</span>
+                        <span className="text-[11px] font-semibold">{headerText}</span>
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                            Double click to edit header (applies to all pages)
+                        </span>
                     </div>
 
                     <div
-                        className="absolute left-0 right-0"
-                        style={{ top: `${PAGE_HEIGHT - PAGE_FOOTER_HEIGHT}px`, height: `${PAGE_FOOTER_HEIGHT}px` }}
+                        className="pointer-events-auto absolute left-1/2 flex w-full max-w-[1100px] -translate-x-1/2 flex-col rounded-b-md border border-slate-400 bg-white/80 px-4 py-2 text-slate-600 shadow"
+                        style={{ top: `${footerTop}px`, height: `${PAGE_FOOTER_HEIGHT}px` }}
+                        onDoubleClick={onFooterDoubleClick}
+                        role="button"
+                        tabIndex={0}
                     >
-                        <div className="mx-auto flex items-center justify-center w-full rounded-b-md border border-slate-400 bg-white/70 text-slate-600" style={{ maxWidth: "8.5in", height: "100%" }}>
-                            <span className="text-[11px] font-semibold">This is a 10% footer area</span>
-                        </div>
+                        <span className="text-[11px] font-semibold">{footerText}</span>
+                        <span className="text-[9px] font-semibold uppercase tracking-[0.3em] text-slate-400">
+                            Double click to edit footer (applies to all pages)
+                        </span>
                     </div>
                 </div>
             );
         })}
     </div>
 );
+
+type HeaderFooterEditModalProps = {
+    region: "header" | "footer";
+    value: string;
+    onChange: (value: string) => void;
+    onCancel: () => void;
+    onSave: () => void;
+};
+
+const HeaderFooterEditModal = ({ region, value, onChange, onCancel, onSave }: HeaderFooterEditModalProps) => {
+    const title = region === "header" ? "Header" : "Footer";
+    return (
+        <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 px-4"
+            onClick={onCancel}
+            role="presentation"
+        >
+            <div
+                className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+            >
+                <p className="text-xs font-semibold uppercase tracking-[0.35em] text-brand-500">{title} editor</p>
+                <h2 className="mt-1 text-lg font-semibold text-slate-900">{title} (shows on every page)</h2>
+                <textarea
+                    value={value}
+                    onChange={(event) => onChange(event.target.value)}
+                    className="mt-4 h-32 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 shadow-inner focus:border-brand-500 focus:outline-none"
+                    placeholder={`Enter ${title.toLowerCase()} text`}
+                />
+                <div className="mt-6 flex justify-end gap-2">
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-slate-300"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onSave}
+                        className="rounded-full bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow hover:bg-brand-500"
+                    >
+                        Save
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
