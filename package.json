@@ -1,0 +1,41 @@
+{
+  "name": "legalbridge-paginator",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@tiptap/extension-character-count": "^2.27.2",
+    "@tiptap/extension-color": "2.4.0",
+    "@tiptap/extension-highlight": "2.4.0",
+    "@tiptap/extension-placeholder": "^2.27.2",
+    "@tiptap/extension-subscript": "2.4.0",
+    "@tiptap/extension-superscript": "2.4.0",
+    "@tiptap/extension-text-align": "^2.27.2",
+    "@tiptap/extension-text-style": "2.4.0",
+    "@tiptap/extension-underline": "2.4.0",
+    "@tiptap/react": "2.4.0",
+    "@tiptap/starter-kit": "2.4.0",
+    "class-variance-authority": "0.7.0",
+    "dayjs": "1.11.11",
+    "lucide-react": "0.363.0",
+    "next": "14.1.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "20.11.5",
+    "@types/react": "18.2.45",
+    "@types/react-dom": "18.2.17",
+    "autoprefixer": "10.4.16",
+    "eslint": "8.56.0",
+    "eslint-config-next": "14.1.0",
+    "postcss": "8.4.32",
+    "tailwindcss": "3.4.1",
+    "typescript": "5.3.3"
+  }
+}

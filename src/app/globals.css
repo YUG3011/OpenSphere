@@ -1,0 +1,189 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #0f172a;
+  background-color: #f8fafc;
+}
+
+body {
+  min-height: 100vh;
+  background-color: #e2e8f0;
+}
+
+.editor-shell {
+  background: #dfe7f5;
+}
+
+.editor-shell::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at top, rgba(255, 255, 255, 0.6), transparent 45%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.tiptap {
+  outline: none;
+  min-height: 100%;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #111827;
+  text-align: left;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+.tiptap {
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.tiptap > * {
+  margin-left: 0;
+  margin-right: 0;
+  max-width: 100%;
+}
+
+.tiptap > *:first-child {
+  margin-top: 0;
+}
+
+.tiptap h1,
+.tiptap h2,
+.tiptap h3,
+.tiptap h4,
+.tiptap h5,
+.tiptap h6 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.tiptap h1 {
+  font-size: 2rem;
+  margin-top: 0;
+}
+
+.tiptap h2 {
+  font-size: 1.5rem;
+  margin-top: 1rem;
+}
+
+.tiptap h3 {
+  font-size: 1.25rem;
+  margin-top: 0.8rem;
+}
+
+.tiptap p {
+  margin-top: 0;
+  margin-bottom: 0;
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+}
+
+.tiptap ul,
+.tiptap ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.tiptap ul li {
+  list-style-type: disc;
+}
+
+.tiptap ol li {
+  list-style-type: decimal;
+}
+
+.tiptap blockquote {
+  border-left: 4px solid #c7d2fe;
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: #475569;
+}
+
+.tiptap strong {
+  font-weight: 600;
+}
+
+.tiptap em {
+  font-style: italic;
+}
+
+.tiptap a {
+  color: #4338ca;
+  text-decoration: underline;
+}
+
+.tiptap code {
+  font-family: "JetBrains Mono", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  background-color: #e2e8f0;
+  padding: 0.15rem 0.35rem;
+  border-radius: 4px;
+  font-size: 0.95rem;
+}
+
+.tiptap pre {
+  background-color: #0f172a;
+  color: #f1f5f9;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
+}
+
+.tiptap hr {
+  border: none;
+  border-top: 2px dashed #cbd5f5;
+  margin: 1.5rem 0;
+}
+
+.page-overlay {
+  pointer-events: none;
+}
+
+.page-overlay__page {
+  width: calc(8.5in + 2px);
+  height: 11in;
+  border-radius: 0.25rem;
+  background: white;
+  box-shadow: 0 15px 40px rgba(15, 23, 42, 0.25);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.printable-page {
+  isolation: isolate;
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .editor-shell {
+    padding: 0 !important;
+    background: transparent;
+  }
+
+  .page-overlay,
+  .pagination-ruler,
+  .pagination-footer,
+  .toolbar {
+    display: none !important;
+  }
+
+  .printable-page {
+    page-break-after: always;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  .tiptap {
+    font-size: 12pt;
+  }
+}

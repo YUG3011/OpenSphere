@@ -1,0 +1,71 @@
+﻿Software Assignment: Document Pagination in Tiptap Editor
+You are allowed to use any AI tools given that you understand what AI wrote.
+Objective
+Design and build a Tiptap-based document editor with real-time pagination that shows users exactly how their legal documents will appear when printed.
+This assignment evaluates your ability to:
+* Solve a specific, scoped technical problem end-to-end
+* Work with rich text editors and understand content measurement challenges
+* Build something production-ready that we could ship to customers
+* Understand how you use AI in your daily coding to get things done
+Deadline: One week after the task is given 
+Follow-up: Code and product review discussion with the team
+Background
+OpenSphere builds legal workflow tools for immigration professionals. One core feature allows users to draft legal documents (cover letters, petitions, support letters) within our platform using a Tiptap-based rich text editor.
+Our customers have requested a key feature: the ability to see page breaks within the editor as they write. When drafting a multi-page letter for USCIS submission, users need to visualize exactly how content will appear when printed, so they know what falls on page 1 vs. page 2, and so on.
+Think of how Google Docs or Microsoft Word shows page boundaries as you type. We want something similar for our editor.
+Scope of Work
+You will build a functional Tiptap editor with pagination. The application should:
+1. Display Visual Page Breaks
+   * Show distinct pages in the editor as the user types
+   * Page breaks should update dynamically as content is added, deleted, or pasted
+   * Clear visual separation between pages (similar to word processors)
+2. Match Print Output
+   * US Letter size (8.5" x 11") with standard 1-inch margins
+   * What users see in the editor should match what prints
+   * This matters because documents are submitted to USCIS and formatting is important
+3. Support Standard Formatting
+   * Headings, paragraphs, bold/italic text, bullet points at minimum
+   * Page breaks should calculate correctly with mixed content types
+4. Handle Edge Cases Gracefully
+   * Long paragraphs that span pages
+   * Content reflow when editing mid-document
+   * Varying line heights from different formatting
+5. Optional Enhancements
+   * Page numbers
+   * Print/export to PDF functionality
+   * Header/footer support
+   * Table support with proper page break handling
+Recommended Technology Stack
+* Frontend: Next.js + Tailwind CSS
+* Editor: Tiptap
+* Backend: Node.js (if needed)
+* Deployment: Vercel, Netlify, or similar
+Getting Started with Tiptap
+If you're new to Tiptap, here are some resources to help you get up to speed:
+* Tiptap Documentation: https://tiptap.dev/docs
+* Installation Guide: https://tiptap.dev/docs/editor/getting-started/install
+* Tiptap + Next.js Setup: https://tiptap.dev/docs/editor/getting-started/install/nextjs
+* Collaboration Features (for context): https://tiptap.dev/docs/collaboration/getting-started/install
+Helpful Tiptap Concepts
+* Extensions: https://tiptap.dev/docs/editor/extensions/overview
+* Custom Extensions: https://tiptap.dev/docs/editor/extensions/custom-extensions
+* Styling the Editor: https://tiptap.dev/docs/editor/getting-started/style-editor
+Pagination-Specific Research
+Pagination in rich text editors is a known challenge. Some directions worth exploring:
+* How content height is calculated in the DOM
+* Tiptap's node views and how to measure rendered content
+* Approaches other editors (ProseMirror, Slate) have taken for pagination
+* CSS paged media concepts
+We're not prescribing a solution. Part of this assignment is figuring out an approach that works.
+Deliverables
+* Working prototype (live link)
+* GitHub repository with clear setup instructions in README
+* Brief write-up (can be in README) explaining:
+   * Your approach to calculating page breaks
+   * Any trade-offs or limitations
+   * What you would improve with more time
+* For the interview call: prepare to explain your thought process and walk through your code
+Where to Submit
+Send an email to atal@opensphere.ai with the subject: "Full-Stack Intern Role - Assignment Submission"
+
+Visit the LegalBridge firm portal → https://firm.legalbridge.ai
