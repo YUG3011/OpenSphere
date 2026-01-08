@@ -110,6 +110,7 @@ const areDecorationSetsEqual = (a: DecorationSet, b: DecorationSet, docSize: num
 type BlockRect = {
     pos: number;
     height: number;
+    nodeSize: number;
 };
 
 const collectBlockRects = (view: EditorView): BlockRect[] => {
@@ -131,6 +132,7 @@ const collectBlockRects = (view: EditorView): BlockRect[] => {
         blocks.push({
             pos,
             height: rect.height,
+            nodeSize: node.nodeSize,
         });
 
         return true;
@@ -145,13 +147,6 @@ const buildFooterDecorations = (view: EditorView) => {
     const dom = view.dom as HTMLElement;
 
     if (!dom) {
-        return DecorationSet.empty;
-    }
-
-    const totalHeight = dom.scrollHeight;
-    const pageCountEstimate = Math.max(1, Math.ceil((totalHeight + PAGE_GAP) / PAGE_STRIDE));
-
-    if (pageCountEstimate <= 1) {
         return DecorationSet.empty;
     }
 
@@ -176,10 +171,21 @@ const buildFooterDecorations = (view: EditorView) => {
             remainingOnPage = PAGE_CONTENT_HEIGHT;
         }
 
-        remainingOnPage -= blockRemaining;
-        if (remainingOnPage <= 0) {
-            remainingOnPage = PAGE_CONTENT_HEIGHT;
+        if (blockRemaining >= remainingOnPage) {
+            const pos = Math.max(1, Math.min(block.pos, doc.content.size));
+            const filler = (blockRemaining - remainingOnPage) + footerCarryHeight;
+            decorations.push(createSpacerDecoration(pos, filler, `page-filler-split-${pos}-${fillerIndex}`));
+            fillerIndex += 1;
+            blockRemaining = remainingOnPage;
         }
+
+        remainingOnPage -= blockRemaining;
+        remainingOnPage = Math.max(remainingOnPage, 0);
+    }
+
+    if (remainingOnPage < PAGE_CONTENT_HEIGHT) {
+        const trailingFiller = remainingOnPage + PAGE_BOTTOM_PADDING;
+        decorations.push(createSpacerDecoration(doc.content.size, trailingFiller, `page-filler-tail-${fillerIndex}`));
     }
 
     return decorations.length ? DecorationSet.create(doc, decorations) : DecorationSet.empty;
