@@ -30,7 +30,7 @@ body {
   outline: none;
   min-height: 100%;
   font-size: 1rem;
-  line-height: 1.6;
+  line-height: var(--editor-line-height, 1.6);
   color: #111827;
   text-align: left;
   width: 100%;
@@ -85,20 +85,24 @@ body {
   margin-bottom: 0;
   padding-top: 0.375rem;
   padding-bottom: 0.375rem;
+  line-height: inherit;
 }
 
 .tiptap ul,
 .tiptap ol {
   margin-left: 1.5rem;
   margin-bottom: 1rem;
+  line-height: inherit;
 }
 
 .tiptap ul li {
   list-style-type: disc;
+  line-height: inherit;
 }
 
 .tiptap ol li {
   list-style-type: decimal;
+  line-height: inherit;
 }
 
 .tiptap blockquote {
