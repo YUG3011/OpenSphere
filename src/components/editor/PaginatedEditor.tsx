@@ -104,6 +104,27 @@ const LINE_SPACING_OPTIONS = [
 
 const footerReservePluginKey = new PluginKey<DecorationSet>("footer-reserve");
 
+const countPageBreaks = (view: EditorView): number => {
+    try {
+        const decoSet = footerReservePluginKey.getState(view.state) as DecorationSet | null;
+        if (!decoSet) {
+            return 0;
+        }
+        const docSize = view.state.doc.content.size;
+        const list = decoSet.find(0, docSize);
+        let breaks = 0;
+        for (const deco of list) {
+            const key = (deco.spec as { key?: string })?.key;
+            if (typeof key === "string" && key.startsWith("page-filler") && !key.includes("tail")) {
+                breaks += 1;
+            }
+        }
+        return Math.max(0, breaks);
+    } catch {
+        return 0;
+    }
+};
+
 const createSpacerDecoration = (pos: number, height: number, key: string) =>
     Decoration.widget(
         pos,
@@ -222,8 +243,10 @@ const buildFooterDecorations = (view: EditorView) => {
     }
 
     if (remainingOnPage < PAGE_CONTENT_HEIGHT) {
-        const trailingFiller = remainingOnPage + PAGE_BOTTOM_PADDING;
-        decorations.push(createSpacerDecoration(doc.content.size, trailingFiller, `page-filler-tail-${fillerIndex}`));
+        const trailingFiller = Math.max(0, Math.round(remainingOnPage));
+        if (trailingFiller > 0) {
+            decorations.push(createSpacerDecoration(doc.content.size, trailingFiller, `page-filler-tail-${fillerIndex}`));
+        }
     }
 
     return decorations.length ? DecorationSet.create(doc, decorations) : DecorationSet.empty;
@@ -304,18 +327,114 @@ const HEADER_GUARD_BUFFER_PX = 8;
 const HEADER_GUARD_MARGIN_PX = 4;
 const HEADER_TARGET_OFFSET_PX = 4;
 let selectionGuardPointerDown = false;
+type PointerSnapshot = { x: number; y: number } | null;
+let lastPointerSnapshot: PointerSnapshot = null;
+
+const pointerFromEvent = (event: Event): PointerSnapshot => {
+    if (typeof window === "undefined") return null;
+    if (event instanceof MouseEvent) {
+        return { x: event.clientX, y: event.clientY };
+    }
+    if (typeof TouchEvent !== "undefined" && event instanceof TouchEvent) {
+        const touch = event.changedTouches?.[0] ?? event.touches?.[0] ?? null;
+        if (touch) {
+            return { x: touch.clientX, y: touch.clientY };
+        }
+    }
+    return null;
+};
+
+const centerViewportOnPos = (view: EditorView, pos: number) => {
+    if (typeof window === "undefined") return;
+    try {
+        const coords = view.coordsAtPos(pos);
+        const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        const scrollY = window.scrollY || window.pageYOffset || 0;
+        const topCoord = coords.top ?? coords.bottom ?? 0;
+        const bottomCoord = coords.bottom ?? coords.top ?? 0;
+        const top = topCoord + scrollY;
+        const bottom = bottomCoord + scrollY;
+        const caretCenter = top + (bottom - top) / 2;
+        const maxScroll = Math.max(0, document.body.scrollHeight - viewportHeight);
+        const target = Math.max(0, Math.min(caretCenter - viewportHeight / 2, maxScroll));
+        window.scrollTo({ top: target, behavior: "smooth" });
+    } catch {
+        view.scrollIntoView();
+    }
+};
+
+type PageBlockSnapshot = {
+    start: number;
+    end: number;
+    top: number;
+    bottom: number;
+};
+
+const collectPageBlocksInRange = (
+    view: EditorView,
+    domRect: DOMRect,
+    bodyTop: number,
+    bodyBottom: number,
+): PageBlockSnapshot[] => {
+    const blocks: PageBlockSnapshot[] = [];
+    const docSize = view.state.doc.content.size;
+    view.state.doc.descendants((node, pos) => {
+        if (!node.isTextblock) {
+            return true;
+        }
+        const domNode = view.nodeDOM(pos);
+        if (!(domNode instanceof HTMLElement)) {
+            return true;
+        }
+        const rect = domNode.getBoundingClientRect();
+        const top = rect.top - domRect.top;
+        const bottom = rect.bottom - domRect.top;
+        if (bottom < bodyTop || top > bodyBottom) {
+            return true;
+        }
+        const start = Math.max(1, Math.min(docSize, pos + 1));
+        const end = Math.max(start, Math.min(docSize, pos + node.nodeSize - 1));
+        blocks.push({ start, end, top, bottom });
+        return true;
+    });
+    return blocks.sort((a, b) => a.top - b.top);
+};
 
 const createSelectionGuardPlugin = () =>
     new Plugin({
         key: selectionGuardPluginKey,
         props: {
             handleDOMEvents: {
-                mousedown() {
+                mousedown(_view, event) {
                     selectionGuardPointerDown = true;
+                    const snapshot = pointerFromEvent(event);
+                    if (snapshot) {
+                        lastPointerSnapshot = snapshot;
+                    }
                     return false;
                 },
-                mouseup() {
+                mouseup(_view, event) {
                     selectionGuardPointerDown = false;
+                    const snapshot = pointerFromEvent(event);
+                    if (snapshot) {
+                        lastPointerSnapshot = snapshot;
+                    }
+                    return false;
+                },
+                touchstart(_view, event) {
+                    selectionGuardPointerDown = true;
+                    const snapshot = pointerFromEvent(event);
+                    if (snapshot) {
+                        lastPointerSnapshot = snapshot;
+                    }
+                    return false;
+                },
+                touchend(_view, event) {
+                    selectionGuardPointerDown = false;
+                    const snapshot = pointerFromEvent(event);
+                    if (snapshot) {
+                        lastPointerSnapshot = snapshot;
+                    }
                     return false;
                 },
             },
@@ -328,6 +447,9 @@ const createSelectionGuardPlugin = () =>
                         if (selectionGuardPointerDown) return;
                         if (view.state.selection.eq(prevState.selection)) return;
                         if (!view.state.doc.eq(prevState.doc)) return;
+
+                        const pointerSnapshot = lastPointerSnapshot;
+                        lastPointerSnapshot = null;
 
                         const selection = view.state.selection;
 
@@ -344,15 +466,30 @@ const createSelectionGuardPlugin = () =>
                         const dom = view.dom as HTMLElement;
                         const domRect = dom.getBoundingClientRect();
 
+                        const dispatchSelection = (targetPos: number) => {
+                            const docSize = view.state.doc.content.size;
+                            const boundedPos = Math.max(1, Math.min(targetPos, docSize));
+                            const tr = view.state.tr.setSelection(
+                                TextSelection.create(view.state.doc, boundedPos),
+                            );
+                            view.dispatch(tr);
+                            centerViewportOnPos(view, boundedPos);
+                        };
+
                         const pos = sel.from;
                         const coords = view.coordsAtPos(pos);
                         if (!coords) return;
 
-                        const relativeTop = coords.top - domRect.top;
-                        const relativeBottom = coords.bottom - domRect.top;
+                        const pointerRelativeTop = pointerSnapshot ? pointerSnapshot.y - domRect.top : null;
+                        const relativeTop = pointerRelativeTop ?? coords.top - domRect.top;
+                        const relativeBottom = pointerRelativeTop ?? coords.bottom - domRect.top;
+                        const pointerColumnX = pointerSnapshot ? pointerSnapshot.x : null;
                         const stride = PAGE_HEIGHT + PAGE_GAP;
                         const pageIndex = Math.max(0, Math.floor(relativeTop / stride));
                         const pageTop = pageIndex * stride;
+                        const pageBodyTopRelative = pageTop + PAGE_TOP_PADDING + 4;
+                        const pageBodyBottomRelative = pageTop + PAGE_HEIGHT - PAGE_BOTTOM_PADDING - 4;
+                        const pageBodyTop = domRect.top + pageBodyTopRelative;
 
                         // Allow clicks just below the header divider, only guard obvious header hits
                         const bodyStart = pageTop + PAGE_TOP_PADDING;
@@ -401,8 +538,7 @@ const createSelectionGuardPlugin = () =>
                             const target = view.posAtCoords({ left: domRect.left + 12, top: targetTop });
                             let targetPos = blockStartPos ?? target?.pos ?? view.state.doc.content.size;
                             if (targetPos < 1) targetPos = 1;
-                            const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, targetPos));
-                            view.dispatch(tr);
+                            dispatchSelection(targetPos);
                             return;
                         }
 
@@ -415,8 +551,54 @@ const createSelectionGuardPlugin = () =>
                             const target = view.posAtCoords({ left: domRect.left + 12, top: targetTop });
                             let targetPos = target?.pos ?? view.state.doc.content.size;
                             if (targetPos < 1) targetPos = view.state.doc.content.size;
-                            const tr = view.state.tr.setSelection(TextSelection.create(view.state.doc, targetPos));
-                            view.dispatch(tr);
+                            dispatchSelection(targetPos);
+                            return;
+                        }
+
+                        // Snap caret within the clicked page body when clicking empty areas
+                        const snapCaretWithinPage = () => {
+                            const columnX = pointerColumnX ?? domRect.left + PAGE_SIDE_PADDING + 8;
+                            const pageBodyBottom = domRect.top + pageBodyBottomRelative;
+                            const { doc } = view.state;
+                            const docSize = doc.content.size;
+
+                            const resolvePos = (coords: { left: number; top: number }, fallback: number) => {
+                                try {
+                                    const result = view.posAtCoords(coords);
+                                    if (result?.pos) {
+                                        return Math.max(1, Math.min(result.pos, docSize));
+                                    }
+                                } catch {
+                                    // ignore
+                                }
+                                return fallback;
+                            };
+
+                            const pageBlocks = collectPageBlocksInRange(
+                                view,
+                                domRect,
+                                pageBodyTopRelative,
+                                pageBodyBottomRelative,
+                            );
+
+                            let pageStartPos: number;
+                            let pageEndPos: number;
+
+                            if (pageBlocks.length) {
+                                pageStartPos = pageBlocks[0].start;
+                                pageEndPos = pageBlocks[pageBlocks.length - 1].end;
+                            } else {
+                                pageStartPos = resolvePos({ left: columnX, top: pageBodyTop }, docSize);
+                                pageEndPos = resolvePos({ left: columnX, top: pageBodyBottom }, pageStartPos);
+                            }
+
+                            const pageText = doc.textBetween(pageStartPos, pageEndPos, "\n", "\n").trim();
+                            const targetPos = pageText.length ? pageEndPos : pageStartPos;
+                            dispatchSelection(targetPos);
+                            return true;
+                        };
+
+                        if (snapCaretWithinPage()) {
                             return;
                         }
                     } catch (e) {
@@ -742,30 +924,17 @@ body.theme-dark .search-highlight,
 `;
 
 const DEFAULT_LETTER = `
-    <h1>USCIS Cover Letter</h1>
-    <p>January 8, 2026</p>
-    <p>USCIS<br />
-        Attn: I-129 Petition for a Nonimmigrant Worker<br />
-        California Service Center
-    </p>
-    <p>Re: Petition for <strong>Maria Rodriguez</strong></p>
-    <p>To Whom It May Concern,</p>
-    <p>
-        Please accept the enclosed Form I-129, Petition for a Nonimmigrant Worker, filed on behalf of Ms. Rodriguez.
-        The petitioner respectfully requests premium processing for this filing as the beneficiary must commence critical
-        project work for our client in Q1.
-    </p>
-    <p>
-        The supporting documents have been organized chronologically to simplify adjudication. Kindly keep the order intact
-        during your review.
-    </p>
-    <ul>
-        <li>Form G-28, Notice of Entry of Appearance</li>
-        <li>Form I-129 with H-1B Data Collection</li>
-        <li>Support letter and exhibits</li>
-    </ul>
-    <p>Thank you for your prompt attention to this matter.</p>
-    <p>Sincerely,<br /> LegalBridge LLP</p>
+   <p>This document is intended to demonstrate how content flows across pages in a paginated editor. As text is added, edited, or removed, the layout automatically recalculates and adjusts to preserve proper margins, spacing, and consistent page boundaries. Each page is designed to match standard print dimensions so that the on-screen experience closely mirrors the final printed or exported document. This alignment between screen and print helps ensure accuracy, predictability, and a professional appearance across all output formats.</p>
+
+<p>The editor carefully manages reserved areas such as headers, footers, and predefined padding zones to ensure that text never overlaps or intrudes into restricted regions. Content is laid out in a structured manner, respecting top and bottom spacing so that each page maintains a clean and readable visual hierarchy. When text reaches the end of the writable area of a page, it flows seamlessly onto the next page without breaking words, sentences, or paragraphs in an unnatural or disruptive way.</p>
+
+<p>This smooth continuation of content is especially important for long-form documents where readability and consistency are essential. Paragraphs are kept intact whenever possible, and page breaks are calculated in a way that avoids awkward splits or visual jumps. These behaviors help maintain a polished layout that meets the expectations of formal documentation, legal correspondence, and professional reports.</p>
+
+<p>In addition to handling content growth, the pagination system dynamically responds to user actions such as typing, deleting, cutting, or pasting text. Each of these actions triggers a recalculation of layout boundaries to ensure that pages are neither overcrowded nor left partially empty in an unintended way. As content is removed, text from subsequent pages shifts upward in a controlled manner, continuing to respect all top and bottom padding constraints.</p>
+
+<p>The system is also designed to prevent the creation of unnecessary blank or trailing pages. During printing or PDF export, the editor evaluates the actual content height and removes any empty pages that do not contain meaningful text. This guarantees that the total page count remains accurate and that the final output does not include extra pages caused by layout artifacts or visual spacing elements.</p>
+
+<p>Overall, the goal of this paginated editor is to provide a reliable, print-ready writing environment that behaves predictably under all editing scenarios. By continuously enforcing spacing rules, recalculating page breaks, and aligning the on-screen layout with real-world print standards, the editor delivers a consistent and professional document creation experience suitable for structured writing, legal filings, and formal business communication.</p>
 `;
 
 const DEFAULT_HEADER_TEXT = "";
@@ -964,6 +1133,7 @@ export const PaginatedEditor = () => {
         },
     });
 
+
     useEffect(() => {
         if (!contentRef.current || typeof ResizeObserver === "undefined") return;
         const observer = new ResizeObserver(() => measureHeight());
@@ -973,15 +1143,26 @@ export const PaginatedEditor = () => {
     }, [measureHeight]);
 
     useEffect(() => {
-        const total = contentHeight + PAGE_MARGIN * 2 + PAGE_GAP;
-        setPageCount(Math.max(1, Math.ceil(total / PAGE_STRIDE)));
-    }, [contentHeight]);
+        const fallbackTotal = contentHeight + PAGE_MARGIN * 2 + PAGE_GAP;
+        const fallbackPages = Math.ceil(fallbackTotal / PAGE_STRIDE);
+        if (!editor || !editor.view) {
+            setPageCount(Math.max(1, fallbackPages));
+            return;
+        }
+        const breaks = countPageBreaks(editor.view);
+        const decorationPages = breaks + 1;
+        setPageCount(Math.max(1, Math.max(decorationPages, fallbackPages)));
+    }, [contentHeight, editor]);
+
+    
 
     const updateActivePage = useCallback(() => {
         if (typeof window === "undefined" || !scrollRef.current) return;
         const containerTop = scrollRef.current.getBoundingClientRect().top + window.scrollY;
         const relativeScroll = Math.max(0, window.scrollY - containerTop);
-        const rawPage = Math.floor((relativeScroll + PAGE_HEIGHT / 2) / PAGE_HEIGHT) + 1;
+        // Advance the active page only when the viewport reaches the bottom of a page
+        // (so new pages appear when the last line is reached), rather than at the center.
+        const rawPage = Math.floor((relativeScroll + PAGE_HEIGHT - 4) / PAGE_HEIGHT) + 1;
         setActivePage(Math.min(pageCount, Math.max(1, rawPage)));
     }, [pageCount]);
 
@@ -1930,6 +2111,7 @@ export const PaginatedEditor = () => {
                                 >
                                     {currentPageNumber}
                                 </button>
+                                
                                 <button
                                     type="button"
                                     onClick={() => setShowPageNumbers((prev) => !prev)}
