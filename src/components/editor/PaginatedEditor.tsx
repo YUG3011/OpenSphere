@@ -359,7 +359,11 @@ const centerViewportOnPos = (view: EditorView, pos: number) => {
         const target = Math.max(0, Math.min(caretCenter - viewportHeight / 2, maxScroll));
         window.scrollTo({ top: target, behavior: "smooth" });
     } catch {
-        view.scrollIntoView();
+        try {
+            (view.dom as HTMLElement)?.scrollIntoView?.({ behavior: "smooth", block: "center" });
+        } catch {
+            // ignore
+        }
     }
 };
 
@@ -965,6 +969,13 @@ const ToolbarButton = ({ label, icon: Icon, isActive = false, onClick, disabled 
 );
 
 const ToolbarDivider = () => <span className="mx-1 h-5 w-px bg-slate-200" aria-hidden="true" />;
+
+type HeaderIconButtonProps = {
+    icon: ComponentType<{ className?: string }>;
+    label: string;
+    onClick: () => void;
+    disabled?: boolean;
+};
 
 const HeaderIconButton = ({ icon: Icon, label, onClick, disabled = false }: HeaderIconButtonProps) => (
     <button
@@ -2360,7 +2371,7 @@ export const PaginatedEditor = () => {
                                     style={{
                                         fontFamily: resolvedFontFamily,
                                         lineHeight: lineSpacing,
-                                ["--editor-line-height"as"--editor-line-height"]: `${lineSpacing}`,
+                                ["--editor-line-height" as any]: `${lineSpacing}`,
                                     }}
                                 />
                             </div>

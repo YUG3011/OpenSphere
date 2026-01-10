@@ -1,6 +1,7 @@
 "use client";
 
 import { Node, mergeAttributes } from "@tiptap/core";
+import type { Editor } from "@tiptap/core";
 import { NodeViewContent, NodeViewWrapper, ReactNodeViewRenderer } from "@tiptap/react";
 
 export type PageSizing = {
@@ -49,7 +50,7 @@ export const PageNode = Node.create<PageNodeOptions>({
   },
 
   addNodeView() {
-    return ReactNodeViewRenderer(({ getPos, editor, extension }) => {
+    return ReactNodeViewRenderer(({ getPos, editor, extension }: { getPos: () => number; editor: Editor; extension: any }) => {
       const s = extension.options.sizing;
       const pos = getPos();
       const $pos = editor.state.doc.resolve(pos);
