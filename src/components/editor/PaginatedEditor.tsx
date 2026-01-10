@@ -893,10 +893,19 @@ body.theme-dark .search-highlight,
         background: transparent !important;
     }
 
-    /* Hide absolute overlay layers (page headers/footers/masks) during print */
+    /* Hide absolute overlay layers (page headers/footers/masks) during print, except footer numbers */
     .pointer-events-none.z-25,
-    .pointer-events-none.z-30 {
+    .pointer-events-none.z-30:not(.page-footer-overlay) {
         display: none !important;
+    }
+
+    /* Re-enable footer page numbers so they print */
+    .pointer-events-none.z-30.page-footer-overlay {
+        display: block !important;
+    }
+
+    .page-footer-overlay span {
+        color: #0f172a !important;
     }
 
     .printable-page {
@@ -2465,7 +2474,7 @@ type PageFooterOverlaysProps = {
 };
 
 const PageFooterOverlays = ({ pageCount, startNumber }: PageFooterOverlaysProps) => (
-    <div aria-hidden className="pointer-events-none absolute inset-0 z-30">
+    <div aria-hidden className="page-footer-overlay pointer-events-none absolute inset-0 z-30">
         {Array.from({ length: pageCount }).map((_, index) => {
             const pageTop = index * (PAGE_HEIGHT + PAGE_GAP);
             const overlayTop = pageTop + PAGE_HEIGHT - PAGE_FOOTER_HEIGHT;
